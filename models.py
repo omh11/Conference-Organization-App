@@ -137,3 +137,14 @@ class SessionForm(messages.Message):
 class SessionForms(messages.Message):
     """SessionForms -- multiple Session outbound form message"""
     items = messages.MessageField(SessionForm, 1, repeated=True)
+
+class SessionFirstQueryForm(messages.Message):
+    """SessionFirstQueryForm -- Session query inbound form message for sessionQueryByDateStartTime endpoint"""
+    date = messages.StringField(1)
+    startTime = messages.StringField(2)
+
+class SessionSecondQueryForm(messages.Message):
+    """SessionFirstQueryForm -- Session query inbound form message for sessionQueryByDateStartTime endpoint"""
+    date = messages.StringField(1)
+    startTime = messages.StringField(2)
+    typeOfSession = messages.StringField(3)

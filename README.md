@@ -27,11 +27,18 @@ App Engine application for the Udacity training course.
 
 The Conference datastore model has an ancestor relationship with the Session datastore model. This is because every conference can have multiple sessions. As a result, every session created has its own unique key. Also the session wishlist is maintained in the user Profile model. This is because the wishlist is tied to the logged in user. The session wishlist is comprised of an array of session keys.
 
-Speaker names are also contained in the session model and are assumed to be unique. Therefore, in this code the speaker names are used as a key to determine the featured speaker. In reality, however, the names of speakers may not be unique and a key would need to be generated for every speaker most likely in a seperate model   
+Speaker names are also contained in the session model and are assumed to be unique. Therefore, in this code the speaker names are used as a key to determine the featured speaker. In reality, however, the names of speakers may not be unique and a key would need to be generated for every speaker most likely in a seperate model.
+
+The Session data model uses a *StringProperty* variable type for variable names *name*, *highlights*, *speaker*, and *typeOfSession* since they are expected to be text inputs. The name variable is always required since all sessions are required to have a name. The *highlight* variable name is set to *repeated* because a session could have more than one highlight. The *duration* and *startTime* variable names both have a *TimeProperty* since they require time inputs. Finally, the date variable is a *DateProperty* since it requires a date input. The session and conference keys are captured in the *SessionForm* only so that they can be passed back through messages to the application.
 
 ## Query related problem design Choices
 
-The query related problem is implemented in the *challengeQuery* endpoint. The problem falls in the restriction that a query cannot contain two inequality conditions. The workaround is handled running two queries. The first query, counts the number of sessions that occur before 7pm. The second query retrieves all sessions that are not workshops and is ordered by start time. Then the number of items fetched from the second query is dependent on the first query. Since the number of sessions before 7pm is known and the second query is ordered by start time, then the sessions that are before 7pm and are not workshops can be obtained.
+The query related problem is implemented in the *challengeQuery* endpoint. The problem falls in the restriction that a query cannot contain two inequality conditions for the same property. The workaround is handled running a query that filters out all sessions after 7pm. The result of the query is then iterated through to find all non-workshop sessions.
+
+The endpoint *sessionQueryByDateStartTime* allows the user to enter a session date and start time. The endpoint then returns a query resulting with all sessions across all conferences that are on a specific date and start after a certain time. The endpoint function definition basically performs a query that filters based on the date and start time.
+
+The endpoint *sessionQueryByDateStartTimeType* allows the user to enter a session date, start time, and type. The endpoint then returns a query resulting with all sessions across all conferences that have a specific type, are on a specific date, and start after a certain time. The endpoint function definition basically performs a query that filters based on the date, type, and start time.
+
 
 [1]: https://developers.google.com/appengine
 [2]: http://python.org

@@ -42,20 +42,21 @@ class SendConfirmationEmailHandler(webapp2.RequestHandler):
 
 class DetermineFeaturedSpeakerHandler(webapp2.RequestHandler):
     def post(self):
-        """Determine if speaker is featured and set in Memcache"""
-        # Create a list of featured speakers.
+        """Set announcement in Memcache for featured speaker and sessions"""
         # Assume that speaker names are unique
         # otherwise would have to introduce a speaker key
-        featuredSpeakers = []
+        featuredSpeaker = ""
         wsck = self.request.get('websafeConferenceKey')
         speakerName = self.request.get('speaker')
         # Count how many times a speaker is assigned to sessions in a particular conference
         speakerCount = Session.query(ancestor=ndb.Key(urlsafe=wsck)).filter(Session.speaker == speakerName).count()
         # Speaker is featured if there is more than one session by speaker in conference
         if speakerCount > 1:
-            featuredSpeakers.append(speakerName)
-        # Set announcement for featured speakers in memcache
-        ConferenceApi._cacheSpeakerAnnouncement(featuredSpeakers)
+            featuredSpeaker = speakerName
+            # Retrieve sessions the speaker is speaking
+            featuredSpeakerSessions = Session.query(ancestor=ndb.Key(urlsafe=wsck)).filter(Session.speaker == featuredSpeaker)
+        # Set announcement for featured speaker and sessions in memcache
+        ConferenceApi._cacheSpeakerAnnouncement(featuredSpeaker, featuredSpeakerSessions)
         self.response.set_status(204)
 
 

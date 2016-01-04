@@ -41,6 +41,8 @@ from models import TeeShirtSize
 from models import Session
 from models import SessionForm
 from models import SessionForms
+from models import SessionFirstQueryForm
+from models import SessionSecondQueryForm
 
 from settings import WEB_CLIENT_ID
 from settings import ANDROID_CLIENT_ID
@@ -55,7 +57,7 @@ MEMCACHE_ANNOUNCEMENTS_KEY = "RECENT_ANNOUNCEMENTS"
 ANNOUNCEMENT_TPL = ('Last chance to attend! The following conferences '
                     'are nearly sold out: %s')
 MEMCACHE_SPEAKER_ANNOUNCEMENTS_KEY = "SPEAKER_ANNOUNCEMENTS"
-SPEAKER_ANNOUNCEMENT_TPL = ('Featured Speaker(s) are: %s')
+SPEAKER_ANNOUNCEMENT_TPL = ('Featured Speaker %s is will be speaking in %s Sessions')
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 DEFAULTS = {
@@ -86,6 +88,13 @@ FIELDS =    {
             'MONTH': 'month',
             'MAX_ATTENDEES': 'maxAttendees',
             }
+
+SESSION_FIELDS =    {
+            'DATE': 'date',
+            'TYPE_OF_SESSION': 'typeOfSession',
+            'START_TIME': 'startTime',
+            }
+
 
 CONF_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
@@ -792,16 +801,16 @@ class ConferenceApi(remote.Service):
 
 
     @staticmethod
-    def _cacheSpeakerAnnouncement(speakers):
+    def _cacheSpeakerAnnouncement(speaker, sessions):
         """Create Speaker Announcement & assign to memcache."""
-        if speakers:
-            # If there are featured speakers,
+        if speaker:
+            # If there is a featured speaker,
             # format announcement and set it in memcache
             speakerAnnouncement = SPEAKER_ANNOUNCEMENT_TPL % (
-                ', '.join(speaker for speaker in speakers))
+                speaker, ', '.join(session.name for session in sessions))
             memcache.set(MEMCACHE_SPEAKER_ANNOUNCEMENTS_KEY, speakerAnnouncement)
         else:
-            # If there are no featured speakers,
+            # If there is no featured speaker,
             # delete the memcache announcements entry
             speakerAnnouncement = ""
             memcache.delete(MEMCACHE_SPEAKER_ANNOUNCEMENTS_KEY)
@@ -816,28 +825,33 @@ class ConferenceApi(remote.Service):
         return StringMessage(data=memcache.get(MEMCACHE_SPEAKER_ANNOUNCEMENTS_KEY))
 
 
-    @endpoints.method(message_types.VoidMessage, SessionForms,
-            path='conference/session/firstQuery',
-            http_method='GET', name='firstQuery')
-    def firstQuery(self, request):
+    @endpoints.method(SessionFirstQueryForm, SessionForms,
+            path='conference/session/sessionQueryByDateStartTime',
+            http_method='GET', name='sessionQueryByDateStartTime')
+    def sessionQueryByDateStartTime(self, request):
         """Query that retrieves sessions on a certain date & after a certain start time"""
+        # Retrieve user input
+        data = {field.name: getattr(request, field.name) for field in request.all_fields()}
+        # Query with user inputs as filters
         q=Session.query()
-        q=q.filter(Session.date==date(2015,3,15))
-        q=q.filter(Session.startTime>time(15, 0, 0, tzinfo=None))
+        q=q.filter(Session.date==datetime.strptime(data['date'][:10], "%Y-%m-%d").date())
+        q=q.filter(Session.startTime>datetime.strptime(data['startTime'][:5], "%H:%M").time())
         q=q.fetch()
+        # Return response of query
         return SessionForms(
             items=[self._copySessionToForm(sess) for sess in q]
             )
 
-    @endpoints.method(message_types.VoidMessage, SessionForms,
-            path='conference/session/secondQuery',
-            http_method='GET', name='secondQuery')
-    def secondQuery(self, request):
+    @endpoints.method(SessionSecondQueryForm, SessionForms,
+            path='conference/session/sessionQueryByDateStartTimeType',
+            http_method='GET', name='sessionQueryByDateStartTimeType')
+    def sessionQueryByDateStartTimeType(self, request):
         """Query that retrieves sessions on a certain date, after a certain time & with a certain type."""
+        data = {field.name: getattr(request, field.name) for field in request.all_fields()}
         q=Session.query()
-        q=q.filter(Session.date==date(2015,3,15)) 
-        q=q.filter(Session.typeOfSession=="workshop") 
-        q=q.filter(Session.startTime>time(15, 0, 0, tzinfo=None)) 
+        q=q.filter(Session.date==datetime.strptime(data['date'][:10], "%Y-%m-%d").date()) 
+        q=q.filter(Session.typeOfSession==data['typeOfSession']) 
+        q=q.filter(Session.startTime>datetime.strptime(data['startTime'][:5], "%H:%M").time()) 
         q=q.fetch()
         return SessionForms(
             items=[self._copySessionToForm(sess) for sess in q]
@@ -848,24 +862,21 @@ class ConferenceApi(remote.Service):
             http_method='GET', name='challengeQuery')
     def challengeQuery(self, request):
         """Query challenge for retrieving two inequalities"""
-        # Query counting the number of sessions that are before 7PM
-        cntq=Session.query()
-        cntq=cntq.filter(Session.startTime<time(19, 0, 0, tzinfo=None))
-        cntq=cntq.count()
-    
-        # Query retrieving all sessions that are not workshops 
-        # ordered by start time and 
-        # then fetching the results based on count query
-        if cntq:
-            q=Session.query()
-            q=q.filter(Session.typeOfSession!="workshop")
-            q=q.order(Session.typeOfSession)
-            q=q.order(Session.startTime)
-            q=q.fetch(cntq)
-        else:
-            q=[]
+        output = []
+        # Query retrieving all sessions that are before 7pm 
+        # and ordered by start time 
+        q=Session.query()
+        q=q.filter(Session.startTime<time(19, 0, 0, tzinfo=None))
+        q=q.order(Session.startTime)
+        q=q.fetch()
+
+        # Iterate through query result and remove all workshop items
+        for i in q:
+            if i.typeOfSession != 'workshop':
+                output.append(i)
+        
         return SessionForms(
-            items=[self._copySessionToForm(sess) for sess in q]
+            items=[self._copySessionToForm(sess) for sess in output]
             )
 
 api = endpoints.api_server([ConferenceApi]) # register API
